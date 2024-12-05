@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EvoChain</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+        }
+        #controls {
+            margin: 20px;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 250px;
+            overflow-y: auto;
+        }
+        #network {
+            flex: 1;
+            height: 100%;
+            border: 1px solid lightgray;
+        }
+        #details {
+            margin: 20px;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 250px;
+            overflow-y: auto;
+            display: none;  /* Hide initially */
+        }
+        #contract-code-modal {
+            display: none;
+            position: fixed;
+            top: 10%;
+            left: 10%;
+            width: 80%;
+            height: 80%;
+            background-color: white;
+            border: 1px solid #ddd;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            overflow: auto;
+        }
+        #contract-code-modal-content {
+            overflow: auto;
+            max-height: 90%;
+            padding-right: 20px;  /* Space for scrollbar */
+        }
+        #contract-code-modal pre {
+            white-space: pre-wrap;
+            background: #f5f5f5;
+            padding: 10px;
+            border: 1px solid #ddd;
+            overflow: auto;
+            max-height: 70%;
+        }
+        #contract-code-modal .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 10px;
+            position: relative;
+        }
+        #contract-code-modal .modal-header h3 {
+            margin: 0;
+        }
+        #contract-code-modal .close-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: transparent;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            font-weight: bold;
+            padding: 5px 10px;
+        }
+        #contract-code-modal .close-btn:hover {
+            color: #ff0000;
+        }
+        #contract-code-modal .file-box {
+            margin-bottom: 20px;
+        }
+        #contract-code-modal .file-box h4 {
+            margin: 0 0 5px 0;
+        }
+        h1 {
+            margin: 20px 0;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #0074D9;
+            color: white;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button:hover {
+            background-color: #005bb5;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;  /* Ensures the text wraps */
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            word-wrap: break-word;  /* Ensures text wraps within the table cell */
+        }
+        #file-content {
+            white-space: pre-wrap;
+            background: #f5f5f5;
+            padding: 10px;
+            border: 1px solid #ddd;
+            overflow: auto;
+            max-height: 300px;
+        }
+        .icon-btn {
+            background: #0074D9; /* Background color */
+            border: none; /* Remove border */
+            cursor: pointer; /* Pointer cursor on hover */
+            padding: 4px; /* Reduce padding inside button to make background smaller */
+            font-size: 18px; /* Icon size */
+            color: white; /* Icon color */
+            border-radius: 5px; /* Rounded corners */
+            margin: 0 10px; /* Horizontal margin to create space between icons */
+        }
+        .icon-btn:hover {
+            background-color: #005bb5; /* Hover background color */
+        }
+        .hidden {
+            display: none; /* Hide element */
+        }
+        .tooltip {
+            position: relative; /* Position relative for tooltip */
+            display: inline-block; /* Inline-block to keep within parent */
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden; /* Hide tooltip text */
+            width: 120px; /* Tooltip width */
+            background-color: #555; /* Tooltip background color */
+            color: #fff; /* Tooltip text color */
+            text-align: center; /* Center text */
+            border-radius: 5px; /* Rounded corners */
+            padding: 5px; /* Padding inside tooltip */
+            position: absolute; /* Absolute positioning */
+            z-index: 1; /* Above other elements */
+            bottom: 125%; /* Position above the icon */
+            left: 50%; /* Center horizontally */
+            margin-left: -60px; /* Center tooltip */
+            opacity: 0; /* Transparent */
+            transition: opacity 0.3s; /* Fade in/out */
+        }
+        .tooltip .tooltiptext::after {
+            content: ""; /* Empty content for arrow */
+            position: absolute; /* Absolute positioning */
+            top: 100%; /* Bottom of tooltip */
+            left: 50%; /* Center arrow */
+            margin-left: -5px; /* Center arrow */
+            border-width: 5px; /* Arrow size */
+            border-style: solid; /* Arrow style */
+            border-color: #555 transparent transparent transparent; /* Arrow color */
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible; /* Show tooltip text */
+            opacity: 1; /* Fully opaque */
+        }
+    </style>
+    <script>
+        let network;
+        let displayedNodes = [];
+        let displayedEdges = [];
+
+        async function fetchAndDisplay(endpoint, params = '', retries = 3) {
+            hideNodeDetails();  // Hide node details on new query
+            for (let attempt = 1; attempt <= retries; attempt++) {
+                try {
+                    const response = await fetch(endpoint + params);
+                    const contentType = response.headers.get('content-type');
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`Network response was not ok: ${response.statusText}\n${errorText}`);
+                    }
+                    if (contentType && contentType.includes('application/json')) {
+                        const result = await response.json();
+                        console.log(result);  // Debug information
+                        displayGraph(result);
+                        return;
+                    } else {
+                        const text = await response.text();
+                        throw new Error(`Expected JSON response but got: ${text}`);
+                    }
+                } catch (error) {
+                    console.error(`Error fetching data (attempt ${attempt}):`, error);
+                    if (attempt === retries) {
+                        alert('Error fetching data: ' + error.message);
+                    } else {
+                        console.log(`Retrying... (${attempt}/${retries})`);
+                    }
+                }
+            }
+        }
+
+        async function fetchContracts() {
+            await fetchAndDisplay('/contracts', '?limit=25');
+        }
+
+        async function fetchProxies() {
+            await fetchAndDisplay('/proxies', '?limit=25');
+        }
+
+        async function fetchRootCauses() {
+            await fetchAndDisplay('/rootcauses', '?limit=25');
+        }
+
+        async function fetchProxyContracts() {
+            const proxyAddress = document.getElementById('proxy-address').value;
+            if (!proxyAddress) {
+                alert('Please enter a proxy address');
+                return;
+            }
+            await fetchAndDisplay('/proxy_contracts', `?proxy_address=${proxyAddress}&limit=25`);
+        }
+
+        async function fetchImplemsRelationships() {
+            await fetchAndDisplay('/implems_relationships', `?limit=25`);
+        }
+
+        async function fetchRootRelationships() {
+            await fetchAndDisplay('/observed_changes', `?limit=25`);
+        }
+
+        async function fetchEtherscanContract(address) {
+            try {
+                const response = await fetch(`/etherscan_contract/${address}`);
+                const contentType = response.headers.get('content-type');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Network response was not ok: ${response.statusText}\n${errorText}`);
+                }
+                if (contentType && contentType.includes('application/json')) {
+                    const result = await response.json();
+                    console.log(result);  // Debug information
+                    displayContractCode(result);
+                } else {
+                    const text = await response.text();
+                    throw new Error(`Expected JSON response but got: ${text}`);
+                }
+            } catch (error) {
+                console.error('Error fetching contract details:', error);
+                alert('Error fetching contract details: ' + error.message);
+            }
+        }
+
+        function shadeColor(color, percent) {
+            let R = parseInt(color.substring(1, 3), 16);
+            let G = parseInt(color.substring(3, 5), 16);
+            let B = parseInt(color.substring(5, 7), 16);
+
+            R = parseInt(R * (100 + percent) / 100);
+            G = parseInt(G * (100 + percent) / 100);
+            B = parseInt(B * (100 + percent) / 100);
+
+            R = (R < 255) ? R : 255;
+            G = (G < 255) ? G : 255;
+            B = (B < 255) ? B : 255;
+
+            const RR = ((R.toString(16).length == 1) ? "0" + R.toString(16) : R.toString(16));
+            const GG = ((G.toString(16).length == 1) ? "0" + G.toString(16) : G.toString(16));
+            const BB = ((B.toString(16).length == 1) ? "0" + B.toString(16) : B.toString(16));
+
+            return "#" + RR + GG + BB;
+        }
+
+        function displayGraph(data) {
+            if (!data.nodes || !data.relationships) {
+                console.error("Invalid data format:", data);
+                alert("Invalid data format: " + JSON.stringify(data, null, 2));
+                return;
+            }
+
+            const colorMap = {
+                'Proxy': '#A7C7E7',     // Blue
+                'SmartContractVersion': '#C1E1C1',  // Green
+                'Change': '#FAA0A0'  // Red
+            };
+
+            displayedNodes = data.nodes.map(node => {
+                const backgroundColor = colorMap[node.labels[0]] || '#848484';
+                const borderColor = shadeColor(backgroundColor, -20); // Darker shade for border
+                return {
+                    id: node.id,
+                    label: node.display,
+                    title: JSON.stringify(node.properties, null, 2),
+                    color: {
+                        background: backgroundColor,
+                        border: borderColor,
+                        highlight: {
+                            background: backgroundColor,
+                            border: borderColor
+                        },
+                        hover: {
+                            background: backgroundColor,
+                            border: borderColor
+                        }
+                    }
+                };
+            });
+
+            displayedEdges = data.relationships.map(rel => ({
+                from: rel.startNode,
+                to: rel.endNode,
+                title: JSON.stringify(rel.properties, null, 2),
+                arrows: 'to'
+            }));
+
+            const container = document.getElementById('network');
+            const dataVis = {
+                nodes: new vis.DataSet(displayedNodes),
+                edges: new vis.DataSet(displayedEdges)
+            };
+            const options = {
+                nodes: {
+                    shape: 'dot',
+                    size: 16,
+                    font: {
+                        size: 14
+                    }
+                },
+                edges: {
+                    width: 2,
+                    font: {
+                        size: 12,
+                        align: 'middle'
+                    },
+                    color: {
+                        color: '#848484',
+                        highlight: '#848484',
+                        hover: '#848484',
+                        inherit: 'from',
+                        opacity: 0.8
+                    },
+                    arrows: {
+                        to: {
+                            enabled: true,
+                            scaleFactor: 0.5
+                        }
+                    },
+                    smooth: {
+                        type: 'dynamic'
+                    }
+                },
+                physics: {
+                    enabled: true,
+                    solver: 'repulsion',
+                    repulsion: {
+                        centralGravity: 0.2,
+                        springLength: 200,
+                        springConstant: 0.05,
+                        nodeDistance: 200,
+                        damping: 0.09
+                    }
+                },
+                interaction: {
+                    hover: true,
+                    navigationButtons: true,
+                    keyboard: true
+                }
+            };
+            network = new vis.Network(container, dataVis, options);
+            network.on('click', function (params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const node = data.nodes.find(n => n.id === nodeId);
+                    displayNodeDetails(node);
+                }
+            });
+        }
+
+        function displayNodeDetails(node) {
+            const detailsContainer = document.getElementById('details');
+            let detailsHTML = '<h3>Node Details</h3>';
+            detailsHTML += '<table>';
+            detailsHTML += '<tr><th>Property</th><th>Value</th></tr>';
+            for (const [key, value] of Object.entries(node.properties)) {
+                detailsHTML += `<tr><td>${key}</td><td>${value}</td></tr>`;
+            }
+            detailsHTML += '</table>';
+            if (node.properties.contract_address) {
+                detailsHTML += `<button onclick="fetchEtherscanContract('${node.properties.contract_address}')">Get Contract Code</button>`;
+            } else if (node.properties.address) {
+                detailsHTML += `<button onclick="fetchEtherscanContract('${node.properties.proxyAddress}')">Get Contract Code</button>`;
+            }
+            detailsContainer.innerHTML = detailsHTML;
+            detailsContainer.style.display = 'block';  // Show the details container
+        }
+
+        function displayContractCode(data) {
+            const modal = document.getElementById('contract-code-modal');
+            let codeHTML = '<div class="modal-header"><h3>Contract Code</h3><button class="close-btn" onclick="closeModal()">X</button></div>';
+            codeHTML += '<div id="contract-code-modal-content">';
+            if (data.contract_details && data.contract_details.result && data.contract_details.result.length > 0) {
+                const contract = data.contract_details.result[0];
+                const sourceCode = contract.SourceCode;
+                const contractName = contract.ContractName;
+                const files = parseSourceCode(sourceCode, contractName);
+
+                if (files.length > 0) {
+                    files.forEach(file => {
+                        codeHTML += `<div class="file-box"><h4>${file[0]}</h4><pre>${file[1]}</pre></div>`;
+                    });
+                } else {
+                    codeHTML += '<p>The code for this contract is not available.</p>';
+                }
+            } else {
+                codeHTML += '<p>The code for this contract is not available.</p>';
+            }
+            codeHTML += '</div>';
+            modal.innerHTML = codeHTML;
+            modal.style.display = 'block';
+        }
+
+        function parseSourceCode(sourceCode, contractName) {
+            let files = [];
+            try {
+                const contractObject = JSON.parse(sourceCode.slice(1, -1));
+                files = Object.entries(contractObject.sources).map(([name, code]) => [name, code.content]);
+            } catch (error) {
+                const lines = sourceCode.split('\n');
+                const indices = lines.reduce((acc, line, i) => {
+                    if (line.startsWith("// Dependency file:") || line.startsWith("// Root file:")) acc.push(i);
+                    return acc;
+                }, []);
+                files = indices.map((start, i) => {
+                    const end = indices[i + 1] || lines.length;
+                    return [lines[start].split(":")[1].trim(), lines.slice(start + 1, end).join('\n')];
+                });
+            }
+            return files;
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('contract-code-modal');
+            modal.style.display = 'none';
+            modal.innerHTML = '';  // Clear the contents
+        }
+
+        function hideNodeDetails() {
+            const detailsContainer = document.getElementById('details');
+            detailsContainer.style.display = 'none';  // Hide the details container
+            detailsContainer.innerHTML = '';  // Clear the contents
+        }
+
+        async function downloadGraphAsJSON() {
+            try {
+                const nodeIds = displayedNodes.map(node => node.id);
+                const edgeIds = displayedEdges.map(edge => edge.id);
+                const response = await fetch('/export_graph', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ node_ids: nodeIds, relationship_ids: edgeIds })
+                });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'graph_data.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                } else {
+                    alert('Failed to download graph');
+                }
+            } catch (error) {
+                console.error('Error downloading graph:', error);
+                alert('Error downloading graph: ' + error.message);
+            }
+        }
+
+        function toggleSearchInput() {
+            const searchInputContainer = document.getElementById('search-input-container');
+            if (searchInputContainer.classList.contains('hidden')) {
+                searchInputContainer.classList.remove('hidden');
+            } else {
+                searchInputContainer.classList.add('hidden');
+            }
+        }
+
+        async function searchGraph() {
+            const searchTerm = document.getElementById('search-term').value;
+            if (!searchTerm) {
+                alert('Please enter a search term');
+                return;
+            }
+            await fetchAndDisplay('/search_graph', `?query=${searchTerm}`);
+        }
+    </script>
+</head>
+<body>
+    <div id="controls">
+        <h1>EvoChain</h1>
+
+        <h2>Fetch Data</h2>
+        <button onclick="fetchContracts()">Get Smart Contracts Versions</button>
+        <button onclick="fetchProxies()">Get Proxies</button>
+        <button onclick="fetchRootCauses()">Get Observed Changes</button>
+
+        <h2>Fetch Relationships</h2>
+        <button onclick="fetchImplemsRelationships()">Get IMPLS Relationships</button>
+        <button onclick="fetchRootRelationships()">Get OBSERVED_CHANGES Relationships</button>
+
+        <label for="proxy-address">Proxy Address:</label>
+        <input type="text" id="proxy-address" name="proxy-address">
+        <button onclick="fetchProxyContracts()">Get Contracts Versions Implemented by Proxy</button>
+
+        <div style="display: flex; align-items: center; justify-content: flex-end; margin-top: 20px;">
+            <div class="tooltip">
+                <button class="icon-btn" onclick="toggleSearchInput()">
+                    <i class="fas fa-search"></i>
+                </button>
+                <span class="tooltiptext">Search</span>
+            </div>
+            <div class="tooltip">
+                <button class="icon-btn" onclick="downloadGraphAsJSON()">
+                    <i class="fas fa-download"></i>
+                </button>
+                <span class="tooltiptext">Download Graph</span>
+            </div>
+        </div>
+        <div id="search-input-container" class="hidden">
+            <label for="search-term">Search Term:</label>
+            <input type="text" id="search-term" name="search-term">
+            <button onclick="searchGraph()">Search</button>
+        </div>
+    </div>
+
+    <div id="network"></div>
+    <div id="details"></div>
+    <div id="contract-code-modal"></div>
+</body>
+</html>
